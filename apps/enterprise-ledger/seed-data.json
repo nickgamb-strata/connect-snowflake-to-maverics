@@ -1,0 +1,237 @@
+{
+  "accounts": [
+    {
+      "account_number": "CHK-100001",
+      "holder_name": "John McClane",
+      "holder_email": "john.mcclane@orchestrator.lab",
+      "type": "checking",
+      "balance": 45230.50,
+      "status": "active"
+    },
+    {
+      "account_number": "SAV-100002",
+      "holder_name": "John McClane",
+      "holder_email": "john.mcclane@orchestrator.lab",
+      "type": "savings",
+      "balance": 128750.00,
+      "status": "active"
+    },
+    {
+      "account_number": "CHK-200001",
+      "holder_name": "Boba Fett",
+      "holder_email": "boba.fett@orchestrator.lab",
+      "type": "checking",
+      "balance": 89100.75,
+      "status": "active"
+    },
+    {
+      "account_number": "INV-200002",
+      "holder_name": "Boba Fett",
+      "holder_email": "boba.fett@orchestrator.lab",
+      "type": "investment",
+      "balance": 512000.00,
+      "status": "active"
+    },
+    {
+      "account_number": "CHK-300001",
+      "holder_name": "Sarah Connor",
+      "holder_email": "sarah.connor@orchestrator.lab",
+      "type": "checking",
+      "balance": 33400.25,
+      "status": "active"
+    },
+    {
+      "account_number": "SAV-300002",
+      "holder_name": "Sarah Connor",
+      "holder_email": "sarah.connor@orchestrator.lab",
+      "type": "savings",
+      "balance": 275000.00,
+      "status": "frozen"
+    },
+    {
+      "account_number": "CHK-400001",
+      "holder_name": "Indiana Jones",
+      "holder_email": "indiana.jones@orchestrator.lab",
+      "type": "checking",
+      "balance": 67890.00,
+      "status": "active"
+    },
+    {
+      "account_number": "CHK-500001",
+      "holder_name": "Lara Croft",
+      "holder_email": "lara.croft@orchestrator.lab",
+      "type": "checking",
+      "balance": 156200.00,
+      "status": "active"
+    }
+  ],
+  "transactions": [
+    {
+      "account_number": "CHK-100001",
+      "type": "credit",
+      "amount": 8500.00,
+      "description": "Payroll deposit - Nakatomi Corp",
+      "counterparty": "Nakatomi Corporation"
+    },
+    {
+      "account_number": "CHK-100001",
+      "type": "debit",
+      "amount": 1200.00,
+      "description": "Wire transfer - Holiday travel",
+      "counterparty": "United Airlines"
+    },
+    {
+      "account_number": "CHK-100001",
+      "type": "debit",
+      "amount": 350.00,
+      "description": "Insurance premium payment",
+      "counterparty": "NYPD Benefits"
+    },
+    {
+      "account_number": "SAV-100002",
+      "type": "credit",
+      "amount": 5000.00,
+      "description": "Transfer from checking",
+      "counterparty": "Internal Transfer"
+    },
+    {
+      "account_number": "CHK-200001",
+      "type": "credit",
+      "amount": 25000.00,
+      "description": "Contract payment - Security services",
+      "counterparty": "Jabba Enterprises"
+    },
+    {
+      "account_number": "CHK-200001",
+      "type": "debit",
+      "amount": 15000.00,
+      "description": "Equipment procurement",
+      "counterparty": "BlasTech Industries"
+    },
+    {
+      "account_number": "INV-200002",
+      "type": "credit",
+      "amount": 12000.00,
+      "description": "Investment return - Q4",
+      "counterparty": "Galactic Securities"
+    },
+    {
+      "account_number": "CHK-300001",
+      "type": "credit",
+      "amount": 9200.00,
+      "description": "Payroll deposit - Cyberdyne Systems",
+      "counterparty": "Cyberdyne Systems"
+    },
+    {
+      "account_number": "CHK-300001",
+      "type": "debit",
+      "amount": 4500.00,
+      "description": "Property tax payment",
+      "counterparty": "LA County Tax"
+    },
+    {
+      "account_number": "SAV-300002",
+      "type": "debit",
+      "amount": 50000.00,
+      "description": "Suspicious withdrawal - flagged",
+      "counterparty": "Unknown Recipient"
+    },
+    {
+      "account_number": "CHK-400001",
+      "type": "credit",
+      "amount": 18000.00,
+      "description": "Research grant deposit",
+      "counterparty": "Marshall College"
+    },
+    {
+      "account_number": "CHK-400001",
+      "type": "debit",
+      "amount": 7500.00,
+      "description": "Travel expenses - Field expedition",
+      "counterparty": "Pan Am Airways"
+    },
+    {
+      "account_number": "CHK-500001",
+      "type": "credit",
+      "amount": 32000.00,
+      "description": "Consulting fee - Archaeological survey",
+      "counterparty": "Croft Holdings Ltd"
+    },
+    {
+      "account_number": "CHK-500001",
+      "type": "debit",
+      "amount": 9800.00,
+      "description": "Equipment and supplies",
+      "counterparty": "Expedition Outfitters"
+    }
+  ],
+  "customer_pii": [
+    {
+      "account_number": "CHK-100001",
+      "ssn": "***-**-4523",
+      "date_of_birth": "1955-03-19",
+      "phone": "+1-212-555-0147",
+      "address": "1400 Nakatomi Plaza, Century City, Los Angeles, CA 90067"
+    },
+    {
+      "account_number": "CHK-200001",
+      "ssn": "***-**-7891",
+      "date_of_birth": "1966-12-24",
+      "phone": "+1-505-555-0199",
+      "address": "42 Slave I Drive, Kamino City, KM 00001"
+    },
+    {
+      "account_number": "CHK-300001",
+      "ssn": "***-**-1984",
+      "date_of_birth": "1965-02-28",
+      "phone": "+1-818-555-0132",
+      "address": "2029 Judgment Way, Los Angeles, CA 90045"
+    },
+    {
+      "account_number": "CHK-400001",
+      "ssn": "***-**-1936",
+      "date_of_birth": "1899-07-01",
+      "phone": "+1-203-555-0188",
+      "address": "38 Archaeology Hall, Marshall College, Bedford, CT 06405"
+    },
+    {
+      "account_number": "CHK-500001",
+      "ssn": "***-**-2013",
+      "date_of_birth": "1968-02-14",
+      "phone": "+44-20-7555-0166",
+      "address": "Croft Manor, Surrey, England, GU25 4QS"
+    }
+  ],
+  "audit_log": [
+    {
+      "action": "account.access",
+      "user": "admin@orchestrator.lab",
+      "resource": "CHK-100001",
+      "details": "Viewed account details for compliance review"
+    },
+    {
+      "action": "account.status_change",
+      "user": "compliance@orchestrator.lab",
+      "resource": "SAV-300002",
+      "details": "Account frozen pending investigation - suspicious activity detected"
+    },
+    {
+      "action": "pii.access",
+      "user": "admin@orchestrator.lab",
+      "resource": "CHK-200001",
+      "details": "PII accessed for KYC verification"
+    },
+    {
+      "action": "transaction.flagged",
+      "user": "fraud-detection@orchestrator.lab",
+      "resource": "SAV-300002",
+      "details": "Transaction flagged: $50,000 withdrawal to unknown recipient"
+    },
+    {
+      "action": "account.create",
+      "user": "onboarding@orchestrator.lab",
+      "resource": "CHK-500001",
+      "details": "New account opened for Lara Croft - standard KYC completed"
+    }
+  ]
+}

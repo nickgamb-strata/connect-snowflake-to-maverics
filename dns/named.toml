@@ -1,0 +1,10 @@
+## Hickory DNS Configuration
+## Serves the orchestrator.lab zone for local blueprint development
+
+listen_addrs_ipv4 = ["0.0.0.0"]
+listen_port = 53
+
+[[zones]]
+zone = "orchestrator.lab"
+zone_type = "Primary"
+file = "/var/named/orchestrator.lab.zone"

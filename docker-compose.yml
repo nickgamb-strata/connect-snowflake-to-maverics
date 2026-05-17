@@ -1,0 +1,243 @@
+services:
+  dns:
+    init: true
+    image: docker.io/hickorydns/hickory-dns:0.25.2
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - ./dns/named.toml:/etc/named.toml:ro
+      - ./dns/orchestrator.lab.zone:/var/named/orchestrator.lab.zone:ro
+    networks:
+      gateway:
+
+  edge-proxy:
+    init: true
+    build:
+      context: .
+      dockerfile: ./images/envoy/Dockerfile
+    ports:
+      - "443:9443"
+    entrypoint: "/usr/local/bin/envoy"
+    command:
+      - "--config-path /etc/envoy.yaml"
+      - "--concurrency 1"
+      - "--mode serve"
+      - "--log-level warn"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9901/ready"]
+      interval: 3s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+    volumes:
+      - ./envoy/config.yaml:/etc/envoy.yaml
+      - ./certs/edge-server.pem:/usr/local/certs/edge-server.pem
+      - ./certs/edge-server-key.pem:/usr/local/certs/edge-server-key.pem
+      - ./certs/internal-client.pem:/usr/local/certs/internal-client.pem
+      - ./certs/internal-client-key.pem:/usr/local/certs/internal-client-key.pem
+      - ./certs/rootCA.pem:/usr/local/certs/rootCA.pem
+    networks:
+      gateway:
+        aliases:
+          - auth.orchestrator.lab
+          - gateway.orchestrator.lab
+
+  keycloak:
+    init: true
+    hostname: keycloak.orchestrator.lab
+    image: quay.io/keycloak/keycloak:26.4.5
+    command: start-dev --import-realm --health-enabled=true --verbose
+    environment:
+      KC_HTTPS_CERTIFICATE_FILE: /usr/local/certs/keycloak-cert.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /usr/local/certs/keycloak-key.pem
+      KC_LOG_LEVEL: info
+      KC_HEALTH_ENABLED: true
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: orchestrator
+      QUARKUS_HTTP_HOST: 0.0.0.0
+    ports:
+      - "8443:8443"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8443"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+    volumes:
+      - ./keycloak/:/opt/keycloak/data/import
+      - ./certs/keycloak-server.pem:/usr/local/certs/keycloak-cert.pem
+      - ./certs/keycloak-server-key.pem:/usr/local/certs/keycloak-key.pem
+    networks:
+      gateway:
+
+  redis:
+    init: true
+    image: redis:8.4-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    networks:
+      gateway:
+
+  vault:
+    init: true
+    image: hashicorp/vault:1.21
+    restart: unless-stopped
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: blueprints
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    command: vault server -dev
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address", "http://127.0.0.1:8200"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      gateway:
+
+  vault-init:
+    image: mikefarah/yq:4
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: blueprints
+      REPO_ROOT: /repo
+    volumes:
+      - ./vault/seed.sh:/vault-init/seed.sh:ro
+      - ./secrets.yaml:/vault-init/secrets.yaml:ro
+      - ./:/repo:ro
+    entrypoint: ["/bin/sh", "/vault-init/seed.sh"]
+    networks:
+      gateway:
+
+  oidc-config-merge:
+    image: mikefarah/yq:4
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/scripts/config-merge.sh"]
+    volumes:
+      - ./config-merge.sh:/scripts/config-merge.sh:ro
+      - ./orchestrator/oidc-provider/maverics.yaml:/config/base.yaml:ro
+      - oidc-provider-config:/config/merged
+    networks:
+      gateway:
+
+  oidc-provider:
+    build:
+      context: .
+      dockerfile: ./images/orchestrator/Dockerfile
+      args:
+        MAVERICS_IMAGE: ${MAVERICS_IMAGE}
+    platform: linux/amd64
+    init: true
+    command: --verbose
+    environment:
+      - MAVERICS_CONFIG=/etc/maverics/config/maverics.yaml
+      - MAVERICS_SECRET_PROVIDER=hashivault+http://vault:8200/secret/data/maverics?token=blueprints
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      oidc-config-merge:
+        condition: service_completed_successfully
+    volumes:
+      - oidc-provider-config:/etc/maverics/config:ro
+      - ./certs/internal-server.pem:/etc/maverics/certs/internal-server.pem
+      - ./certs/internal-server-key.pem:/etc/maverics/certs/internal-server-key.pem
+      - ./certs/internal-client.pem:/etc/maverics/certs/internal-client.pem
+      - ./certs/internal-client-key.pem:/etc/maverics/certs/internal-client-key.pem
+      - ./certs/rootCA.pem:/etc/maverics/certs/rootCA.pem
+    networks:
+      gateway:
+        ipv4_address: 10.80.0.10
+
+  ai-identity-gateway:
+    build:
+      context: .
+      dockerfile: ./images/orchestrator/Dockerfile
+      args:
+        MAVERICS_IMAGE: ${MAVERICS_IMAGE}
+    platform: linux/amd64
+    init: true
+    command: --verbose
+    environment:
+      - MAVERICS_CONFIG=/etc/maverics/maverics.yaml
+      - MAVERICS_SECRET_PROVIDER=hashivault+http://vault:8200/secret/data/maverics?token=blueprints
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./orchestrator/ai-identity-gateway/maverics.yaml:/etc/maverics/maverics.yaml:ro
+      - ./orchestrator/ai-identity-gateway/policies:/etc/maverics/policies:ro
+      - ./apps/employee-directory/openapi.yaml:/etc/maverics/apps/employee-directory/openapi.yaml:ro
+      - ./certs/internal-server.pem:/etc/maverics/certs/internal-server.pem
+      - ./certs/internal-server-key.pem:/etc/maverics/certs/internal-server-key.pem
+      - ./certs/rootCA.pem:/etc/maverics/certs/rootCA.pem
+    networks:
+      gateway:
+        ipv4_address: 10.80.0.11
+
+  enterprise-ledger:
+    init: true
+    build:
+      context: ./apps/enterprise-ledger
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8080
+      - JWT_ISSUER=https://auth.orchestrator.lab
+      - JWT_AUDIENCE=https://enterprise-ledger.orchestrator.lab/
+      - JWKS_ENDPOINT=https://auth.orchestrator.lab/oauth2/jwks
+      - SSL_CERT_FILE=/etc/certs/rootCA.pem
+      - SEED_FILE=/etc/data/seed-data.json
+    volumes:
+      - ./certs/rootCA.pem:/etc/certs/rootCA.pem:ro
+      - ./apps/enterprise-ledger/seed-data.json:/etc/data/seed-data.json:ro
+    networks:
+      gateway:
+        ipv4_address: 10.80.0.60
+
+  employee-directory:
+    init: true
+    build:
+      context: ./apps/employee-directory
+      dockerfile: Dockerfile
+    environment:
+      - PORT=8443
+      - TLS_CERT_FILE=/etc/certs/internal-server.pem
+      - TLS_KEY_FILE=/etc/certs/internal-server-key.pem
+      - JWT_ISSUER=https://auth.orchestrator.lab
+      - JWT_AUDIENCE=https://employee-directory.orchestrator.lab/
+      - JWKS_ENDPOINT=https://auth.orchestrator.lab/oauth2/jwks
+      - SSL_CERT_FILE=/etc/certs/rootCA.pem
+      - SEED_FILE=/etc/data/seed-data.json
+    volumes:
+      - ./certs/internal-server.pem:/etc/certs/internal-server.pem:ro
+      - ./certs/internal-server-key.pem:/etc/certs/internal-server-key.pem:ro
+      - ./certs/rootCA.pem:/etc/certs/rootCA.pem:ro
+      - ./apps/employee-directory/seed-data.json:/etc/data/seed-data.json:ro
+    networks:
+      gateway:
+        ipv4_address: 10.80.0.40
+        aliases:
+          - employee-directory.orchestrator.lab
+
+networks:
+  gateway:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.80.0.0/16
+          gateway: 10.80.0.1
+
+volumes:
+  oidc-provider-config:
+    driver: local
+  redis-data:
+    driver: local

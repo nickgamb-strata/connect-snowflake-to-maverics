@@ -1,0 +1,179 @@
+version: 0.0.1
+
+logger:
+  level: debug
+  logSessionID: true
+  timeFormat: RFC3339Nano
+  fieldOrdering:
+    enabled: true
+
+http:
+  address: 0.0.0.0:9443
+  hosts:
+    - default: true
+      tls: edge-mtls
+
+tls:
+  edge-mtls:
+    certFile: /etc/maverics/certs/internal-server.pem
+    keyFile: /etc/maverics/certs/internal-server-key.pem
+    clientAuth: RequireAndVerifyClientCert
+    clientCAFiles:
+      - /etc/maverics/certs/rootCA.pem
+  oidc-provider:
+    caFile: /etc/maverics/certs/rootCA.pem
+    minVersion: 1.3
+
+mcpProvider:
+  enabled: true
+  transports:
+    sse:
+      enabled: true
+      path: "/mcp/sse"
+      messagePath: "/mcp/message"
+      keepAlive:
+        enabled: true
+        interval: 30s
+    stream:
+      enabled: true
+      path: "/mcp"
+      session:
+        enabled: true
+        headerName: "Mcp-Session-Id"
+        allowClientTermination: true
+        timeout: 1h
+  authorization:
+    oauth:
+      enabled: true
+      metadataPath: /.well-known/oauth-protected-resource
+      servers:
+        - wellKnownEndpoint: https://auth.orchestrator.lab/.well-known/oauth-authorization-server
+          refreshInterval: 24h
+          tokenValidation:
+            expectedAudiences:
+              - https://gateway.orchestrator.lab/
+            method: jwt
+            jwt:
+              clockSkew: 15s
+
+connectors:
+  - name: oidc-provider
+    type: oidc
+    tls: oidc-provider
+    oidcWellKnownURL: https://auth.orchestrator.lab/.well-known/oauth-authorization-server
+    oauthLoginRedirect:
+      urls:
+        - https://gateway.orchestrator.lab/oidc-callback
+    oauthLogoutRedirect:
+      urls:
+        - https://gateway.orchestrator.lab/logout
+    oauthClientID: ai-identity-gateway
+    oauthClientSecret: <ai_identity_gateway.oidc_client_secret>
+
+apps:
+  # MCP Proxy to Enterprise Ledger (token exchange for JWT auth)
+  # Sensitive tools (getCustomerPII, getAuditLog) gated by OPA inbound policy
+  - name: enterprise-ledger-proxy
+    type: mcpProxy
+    toolNamespace:
+      disabled: false
+      name: enterprise_ledger_
+    upstream:
+      transport: stream
+      stream:
+        url: http://enterprise-ledger:8080/mcp
+        connection:
+          dialTimeout: 10s
+          keepAlive:
+            interval: 15s
+          pool:
+            maxIdleConns: 100
+            maxIdleConnsPerHost: 100
+    authorization:
+      inbound:
+        opa:
+          name: enterprise-ledger-inbound-authz
+          file: /etc/maverics/policies/enterprise-ledger-inbound-authz.rego
+      outbound:
+        type: tokenExchange
+        tokenExchange:
+          type: delegation
+          idp: oidc-provider
+          audience: https://enterprise-ledger.orchestrator.lab/
+          tools:
+            - name: listAccounts
+              ttl: 5s
+              scopes:
+                - name: ledger:ListAccounts
+            - name: getAccount
+              ttl: 5s
+              scopes:
+                - name: ledger:GetAccount
+            - name: getTransactions
+              ttl: 5s
+              scopes:
+                - name: ledger:ListTransactions
+            - name: updateAccountStatus
+              ttl: 5s
+              scopes:
+                - name: ledger:UpdateAccount
+            - name: getCustomerPII
+              ttl: 5s
+              scopes:
+                - name: ledger:ReadPII
+            - name: getAuditLog
+              ttl: 5s
+              scopes:
+                - name: ledger:ReadAudit
+
+  # MCP Bridge — auto-generates MCP tools from Employee Directory OpenAPI spec
+  - name: employee-directory-bridge
+    type: mcpBridge
+    mode: openapi
+    toolNamespace:
+      disabled: false
+      name: employee_directory_
+    openapi:
+      spec:
+        uri: file:///etc/maverics/apps/employee-directory/openapi.yaml
+      baseURL: https://employee-directory.orchestrator.lab:8443/api/v1
+    authorization:
+      inbound:
+        opa:
+          name: employee-directory-bridge-inbound-authz
+          file: /etc/maverics/policies/employee-directory-bridge-inbound-authz.rego
+      outbound:
+        type: tokenExchange
+        tokenExchange:
+          type: delegation
+          idp: oidc-provider
+          audience: https://employee-directory.orchestrator.lab/
+          tools:
+            - name: listEmployees
+              ttl: 5s
+              scopes:
+                - name: employee:List
+            - name: getEmployee
+              ttl: 5s
+              scopes:
+                - name: employee:Get
+            - name: getDirectReports
+              ttl: 5s
+              scopes:
+                - name: employee:List
+            - name: listDepartments
+              ttl: 5s
+              scopes:
+                - name: department:List
+            - name: createEmployee
+              ttl: 5s
+              scopes:
+                - name: employee:Create
+            - name: updateEmployee
+              ttl: 5s
+              scopes:
+                - name: employee:Update
+            - name: deactivateEmployee
+              ttl: 5s
+              scopes:
+                - name: employee:Deactivate

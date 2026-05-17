@@ -1,0 +1,18 @@
+$ORIGIN orchestrator.lab.
+$TTL 300
+
+@       IN      SOA     ns.orchestrator.lab. admin.orchestrator.lab. (
+                        2024010101      ; Serial
+                        3600            ; Refresh
+                        600             ; Retry
+                        86400           ; Expire
+                        300             ; Minimum TTL
+                        )
+
+; Nameserver
+@       IN      NS      ns.orchestrator.lab.
+ns      IN      A       127.0.0.1
+
+; Wildcard - all subdomains resolve to localhost
+@       IN      A       127.0.0.1
+*       IN      A       127.0.0.1

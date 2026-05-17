@@ -1,0 +1,156 @@
+version: 0.0.1
+
+logger:
+  level: debug
+  logSessionID: true
+  timeFormat: RFC3339Nano
+  fieldOrdering:
+    enabled: true
+
+http:
+  address: 0.0.0.0:9443
+  hosts:
+    - default: true
+      tls: edge-mtls
+
+tls:
+  edge-mtls:
+    certFile: /etc/maverics/certs/internal-server.pem
+    keyFile: /etc/maverics/certs/internal-server-key.pem
+    clientAuth: RequireAndVerifyClientCert
+    clientCAFiles:
+      - /etc/maverics/certs/rootCA.pem
+  keycloak:
+    caFile: /etc/maverics/certs/rootCA.pem
+    minVersion: 1.3
+
+health: {}
+
+session:
+  cookie:
+    name: maverics_session
+  lifetime:
+    maxTimeout: 24h
+    idleTimeout: 15m
+  store:
+    type: local
+
+connectors:
+  - name: keycloak
+    type: oidc
+    tls: keycloak
+    oidcWellKnownURL: https://keycloak.orchestrator.lab:8443/realms/blueprints/.well-known/openid-configuration
+    oauthClientID: ai-identity-gateway-oidc
+    oauthClientSecret: <ai_identity_gateway.keycloak_client_secret>
+    oauthLoginRedirect:
+      urls:
+        - https://auth.orchestrator.lab/oidc-callback/keycloak
+    oauthLogoutRedirect:
+      urls:
+        - https://auth.orchestrator.lab/logout/keycloak
+    disablePKCE: false
+    scopes: openid profile email
+    offlineAccess:
+      enabled: false
+
+caches:
+  - name: oidc-provider-cache
+    type: redis
+    redis:
+      addresses:
+        - redis:6379
+    encryption:
+      disabled: false
+      keys:
+        current: <ai_identity_gateway.redis_encryption_key_current>
+        old:
+          - <ai_identity_gateway.redis_encryption_key_old_1>
+          - <ai_identity_gateway.redis_encryption_key_old_2>
+    hashing:
+      keys:
+        disabled: false
+
+oidcProvider:
+  correlateSession: true
+  cache: oidc-provider-cache
+  discovery:
+    issuer: https://auth.orchestrator.lab
+    endpoints:
+      wellKnown: https://auth.orchestrator.lab/.well-known/oauth-authorization-server
+      jwks: https://auth.orchestrator.lab/oauth2/jwks
+      auth: https://auth.orchestrator.lab/oauth2/auth
+      token: https://auth.orchestrator.lab/oauth2/token
+      userinfo: https://auth.orchestrator.lab/oauth2/userinfo
+      introspect: https://auth.orchestrator.lab/oauth2/introspect
+  jwks:
+    - algorithm: RSA256
+      publicKey: <ai_identity_gateway.oidc_signing_public_key>
+      privateKey: <ai_identity_gateway.oidc_signing_private_key>
+
+apps:
+  # Public client for Claude Code (and other CLI/IDE MCP clients)
+  - name: mcp-client-cli
+    type: oidc
+    clientID: mcp-client-cli
+    public: true
+    redirectURLs:
+      - http://localhost:19876/callback
+      - http://127.0.0.1:19876/callback
+      - http://localhost:3334/oauth/callback
+      - http://127.0.0.1:3334/oauth/callback
+    authentication:
+      idps:
+        - keycloak
+    accessToken:
+      type: jwt
+    allowedAudiences:
+      - https://gateway.orchestrator.lab/
+    customScopes:
+      scopes:
+        - name: pii:read
+        - name: audit:read
+    claimsMapping:
+      email: keycloak.email
+      name: keycloak.email
+      family_name: keycloak.family_name
+      given_name: keycloak.given_name
+
+  # AI Identity Gateway client for RFC 8693 token exchange
+  - name: ai-identity-gateway
+    type: oidc
+    clientID: ai-identity-gateway
+    credentials:
+      secrets:
+        - <ai_identity_gateway.oidc_client_secret>
+    authentication:
+      idps:
+        - keycloak
+    grantTypes:
+      - client_credentials
+      - urn:ietf:params:oauth:grant-type:token-exchange
+    accessToken:
+      type: jwt
+    allowedAudiences:
+      - https://employee-directory.orchestrator.lab/
+      - https://enterprise-ledger.orchestrator.lab/
+    customScopes:
+      scopes:
+        # Employee Directory scopes
+        - name: employee:List
+        - name: employee:Get
+        - name: employee:Create
+        - name: employee:Update
+        - name: employee:Deactivate
+        - name: department:List
+        # Enterprise Ledger scopes (standard)
+        - name: ledger:ListAccounts
+        - name: ledger:GetAccount
+        - name: ledger:ListTransactions
+        - name: ledger:UpdateAccount
+        # Enterprise Ledger scopes (sensitive)
+        - name: ledger:ReadPII
+        - name: ledger:ReadAudit
+    claimsMapping:
+      email: keycloak.email
+      name: keycloak.email
+      sub: keycloak.sub

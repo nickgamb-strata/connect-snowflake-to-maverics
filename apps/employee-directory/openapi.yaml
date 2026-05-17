@@ -1,0 +1,435 @@
+openapi: 3.0.0
+info:
+  title: Employee Directory API
+  description: Enterprise employee directory service for managing employee records
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@orchestrator.lab
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token issued by the organization's identity provider
+
+  schemas:
+    Employee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        employee_id:
+          type: string
+          description: Human-readable employee identifier
+          example: "EMP-001"
+        first_name:
+          type: string
+          example: "Jane"
+        last_name:
+          type: string
+          example: "Smith"
+        email:
+          type: string
+          format: email
+          example: "jane.smith@orchestrator.lab"
+        department:
+          type: string
+          example: "Engineering"
+        title:
+          type: string
+          example: "Senior Software Engineer"
+        manager_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the employee's manager
+        location:
+          type: string
+          example: "San Francisco, CA"
+        start_date:
+          type: string
+          format: date
+          example: "2023-01-15"
+        status:
+          type: string
+          enum: [active, inactive, on_leave]
+          default: active
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - first_name
+        - last_name
+        - email
+        - department
+        - title
+
+    EmployeeCreate:
+      type: object
+      properties:
+        employee_id:
+          type: string
+          example: "EMP-001"
+        first_name:
+          type: string
+          example: "Jane"
+        last_name:
+          type: string
+          example: "Smith"
+        email:
+          type: string
+          format: email
+          example: "jane.smith@orchestrator.lab"
+        department:
+          type: string
+          example: "Engineering"
+        title:
+          type: string
+          example: "Senior Software Engineer"
+        manager_id:
+          type: string
+          format: uuid
+          nullable: true
+        location:
+          type: string
+          example: "San Francisco, CA"
+        start_date:
+          type: string
+          format: date
+          example: "2023-01-15"
+      required:
+        - first_name
+        - last_name
+        - email
+        - department
+        - title
+
+    EmployeeUpdate:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        department:
+          type: string
+        title:
+          type: string
+        manager_id:
+          type: string
+          format: uuid
+          nullable: true
+        location:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, on_leave]
+
+    EmployeeList:
+      type: object
+      properties:
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "NOT_FOUND"
+        message:
+          type: string
+          example: "Employee not found"
+
+paths:
+  /employees:
+    get:
+      summary: List employees
+      description: Retrieve a paginated list of employees with optional filtering
+      operationId: listEmployees
+      tags:
+        - Employees
+      parameters:
+        - name: department
+          in: query
+          description: Filter by department
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by employment status
+          schema:
+            type: string
+            enum: [active, inactive, on_leave]
+        - name: manager_id
+          in: query
+          description: Filter by manager ID
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Search by name or email
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number (1-based)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeList'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Create employee
+      description: Create a new employee record
+      operationId: createEmployee
+      tags:
+        - Employees
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeCreate'
+      responses:
+        '201':
+          description: Employee created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Employee already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /employees/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Employee UUID
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get employee
+      description: Retrieve a single employee by ID
+      operationId: getEmployee
+      tags:
+        - Employees
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update employee
+      description: Update an existing employee record
+      operationId: updateEmployee
+      tags:
+        - Employees
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeUpdate'
+      responses:
+        '200':
+          description: Employee updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Deactivate employee
+      description: Set employee status to inactive (soft delete)
+      operationId: deactivateEmployee
+      tags:
+        - Employees
+      responses:
+        '200':
+          description: Employee deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /employees/{id}/reports:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Manager's employee UUID
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      summary: Get direct reports
+      description: Retrieve all employees who report to the specified manager
+      operationId: getDirectReports
+      tags:
+        - Employees
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeList'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /departments:
+    get:
+      summary: List departments
+      description: Retrieve a list of all departments
+      operationId: listDepartments
+      tags:
+        - Departments
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  departments:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Engineering", "Sales", "Marketing", "HR", "Finance"]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

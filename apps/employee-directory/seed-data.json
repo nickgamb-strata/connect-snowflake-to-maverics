@@ -1,0 +1,120 @@
+{
+  "employees": [
+    {
+      "employee_id": "EMP-001",
+      "first_name": "Boba",
+      "last_name": "Fett",
+      "email": "boba.fett@orchestrator.lab",
+      "department": "Security",
+      "title": "Chief Security Officer",
+      "location": "Mandalore",
+      "start_date": "2019-05-04",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-002",
+      "first_name": "John",
+      "last_name": "McClane",
+      "email": "john.mcclane@orchestrator.lab",
+      "department": "Security",
+      "title": "Senior Security Analyst",
+      "manager_id": "EMP-001",
+      "location": "Los Angeles, CA",
+      "start_date": "2020-12-24",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-003",
+      "first_name": "Sarah",
+      "last_name": "Connor",
+      "email": "sarah.connor@orchestrator.lab",
+      "department": "Engineering",
+      "title": "VP of Engineering",
+      "location": "Los Angeles, CA",
+      "start_date": "1984-10-26",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-004",
+      "first_name": "Indiana",
+      "last_name": "Jones",
+      "email": "indiana.jones@orchestrator.lab",
+      "department": "Research",
+      "title": "Director of Research",
+      "location": "Princeton, NJ",
+      "start_date": "1981-06-12",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-005",
+      "first_name": "Lara",
+      "last_name": "Croft",
+      "email": "lara.croft@orchestrator.lab",
+      "department": "Research",
+      "title": "Senior Archaeologist",
+      "manager_id": "EMP-004",
+      "location": "London, UK",
+      "start_date": "1996-10-25",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-006",
+      "first_name": "Ellen",
+      "last_name": "Ripley",
+      "email": "ellen.ripley@orchestrator.lab",
+      "department": "Operations",
+      "title": "Chief Operations Officer",
+      "location": "Gateway Station",
+      "start_date": "1979-05-25",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-007",
+      "first_name": "James",
+      "last_name": "Bond",
+      "email": "james.bond@orchestrator.lab",
+      "department": "Security",
+      "title": "Special Agent",
+      "manager_id": "EMP-001",
+      "location": "London, UK",
+      "start_date": "1962-10-05",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-008",
+      "first_name": "Kyle",
+      "last_name": "Reese",
+      "email": "kyle.reese@orchestrator.lab",
+      "department": "Engineering",
+      "title": "Senior Software Engineer",
+      "manager_id": "EMP-003",
+      "location": "Los Angeles, CA",
+      "start_date": "2029-05-12",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-009",
+      "first_name": "Han",
+      "last_name": "Solo",
+      "email": "han.solo@orchestrator.lab",
+      "department": "Operations",
+      "title": "Logistics Manager",
+      "manager_id": "EMP-006",
+      "location": "Millennium Station",
+      "start_date": "1977-05-25",
+      "status": "active"
+    },
+    {
+      "employee_id": "EMP-010",
+      "first_name": "Marion",
+      "last_name": "Ravenwood",
+      "email": "marion.ravenwood@orchestrator.lab",
+      "department": "Research",
+      "title": "Research Coordinator",
+      "manager_id": "EMP-004",
+      "location": "Nepal",
+      "start_date": "1981-06-12",
+      "status": "active"
+    }
+  ]
+}
