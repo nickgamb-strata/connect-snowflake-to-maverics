@@ -12,6 +12,18 @@ Snowflake's 30-day trial supports `EXTERNAL_OAUTH_INTEGRATION TYPE = CUSTOM` —
 no Enterprise edition required. Pick the smallest available cloud region;
 the TPC-H sample data this demo queries is replicated everywhere.
 
+## JWKS reachability (local-lab vs. production)
+
+The setup script writes `EXTERNAL_OAUTH_JWS_KEYS_URL` into the security
+integration; Snowflake fetches that URL during JWT validation. In this lab
+that's a Cloudflare Tunnel pointed at Maverics' `/oauth2/jwks` — convenient
+because it lets `docker-compose` be reachable from Snowflake's network
+without any infrastructure. **Don't do this in production.** Publish JWKS
+from your normal hardened public origin (CDN-fronted static `jwks.json`,
+managed cloud function, API gateway in front of Maverics, etc.) and point
+`BEDROCK_AUTH_HOSTNAME` at that host instead. Maverics never moves; only
+the URL Snowflake fetches from changes.
+
 ## What the demo expects
 
 After `make snowflake-setup` runs `setup.sql`:
@@ -45,21 +57,31 @@ make snowflake-setup
 The script is idempotent — every `CREATE` uses `IF NOT EXISTS` or
 `CREATE OR REPLACE`, so it's safe to re-run.
 
-## Two grant types, two `sub` values
+## Two grant types, two user-mapping paths
 
-This tutorial registers a single Maverics OIDC client
-(`mcp-client-cli-snowflake`) that supports two grant types. The `sub` claim
-in the issued JWT depends on which one fires:
+`mcp-client-cli-snowflake` (the Maverics OIDC client in this tutorial)
+supports two grant types. They issue different identity claims, and
+`MAVERICS_EXTERNAL_OAUTH` is configured to map either claim to `LOGIN_NAME`
+via `EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = ('email','sub')` — Snowflake
+tries `email` first, falls back to `sub`. This lets the same security
+integration serve both service-account and human-workforce flows.
 
-- **`client_credentials`** — driven by `scripts/snowflake-demo.sh`. `sub` =
-  `mcp-client-cli-snowflake`. Snowflake's `EXTERNAL_OAUTH` maps that to
-  `MAVERICS_AGENT` via `LOGIN_NAME`. Use this for non-interactive tests, CI,
-  and the demo script.
+- **`client_credentials`** — driven by `scripts/snowflake-demo.sh`. The JWT
+  has `sub = mcp-client-cli-snowflake` and no `email` claim. Snowflake's
+  `EXTERNAL_OAUTH` falls through to `sub` and maps it to **`MAVERICS_AGENT`**
+  (whose `LOGIN_NAME` is `mcp-client-cli-snowflake`). Use this for
+  non-interactive tests, CI, and the demo script.
 
-- **`authorization_code` + PKCE** — driven by Claude Desktop (or any other
-  PKCE-capable MCP client). The user authenticates against Keycloak; `sub` =
-  the user's Keycloak `sub`. To support this path, create a second Snowflake
-  user with `LOGIN_NAME` set to that Keycloak `sub` and grant it
+- **`authorization_code` + PKCE** — driven by Claude Desktop, Cursor, or any
+  other PKCE-capable MCP client. The user authenticates against Keycloak;
+  the exchanged JWT carries `email = john.mcclane@orchestrator.lab` (or
+  whichever Keycloak user logged in) and `sub` = the Keycloak UUID.
+  `setup.sql` pre-provisions two test users that match the test Keycloak
+  identities by email — **`JOHN_MCCLANE`** (`LOGIN_NAME =
+  'john.mcclane@orchestrator.lab'`) and **`SARAH_CONNOR`** (`LOGIN_NAME =
+  'sarah.connor@orchestrator.lab'`). To onboard your own workforce, replace
+  those two with `CREATE USER` statements whose `LOGIN_NAME` matches each
+  human's stable IdP email (or the claim of your choice) and grant
   `MAVERICS_DEMO_ROLE`.
 
 Either way the federation mechanics are identical — Maverics signs, Snowflake

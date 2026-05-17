@@ -1,11 +1,21 @@
 // Package main is a Maverics Service Extension that injects compounded agent
-// identity claims into access tokens issued by the OIDC Provider.
+// identity claims — and, for workforce flows, the user's email and Keycloak
+// sub — into access tokens issued by the OIDC Provider.
 //
 // Wired on apps[].buildAccessTokenClaimsSE for the mcp-client-cli-snowflake
 // client. The OIDC Provider invokes BuildAccessTokenClaims during token
 // minting (every grant type, including authorization_code, client_credentials,
 // and token-exchange); the map this function returns is merged into the
 // access token before the token is signed and returned to the caller.
+//
+// Why this injects email:
+//   The OIDC `email` scope authorizes /userinfo to expose the user's email
+//   but does NOT by itself put `email` into the access-token JWT. Maverics'
+//   declarative `claimsMapping` block populates ID tokens / userinfo, also
+//   not the access token. Snowflake's EXTERNAL_OAUTH_INTEGRATION matches
+//   identity from the access-token JWT, so without this SE no resource
+//   server sees the workforce user's email — only the compound
+//   `sub: <idp-url>|<keycloak-uuid>` Maverics builds for delegated sessions.
 //
 // In the lab flow:
 //   MCP client (Claude Desktop, CLI, …) --POST /oauth2/token--> Maverics OIDC
@@ -30,6 +40,7 @@ import (
 	"strings"
 
 	"github.com/strata-io/service-extension/orchestrator"
+	"github.com/strata-io/service-extension/session"
 )
 
 // BuildAccessTokenClaims is the hook function called by the Orchestrator's
@@ -69,12 +80,35 @@ func BuildAccessTokenClaims(api orchestrator.Orchestrator, req *http.Request) (m
 		"delegation_purpose": purpose,
 	}
 
-	log.Info("agent-claims-se", "injected agent claims",
+	// On authorization_code (workforce) grants there is a user session bound
+	// to the request with attributes populated by the keycloak OIDC connector
+	// during the auth code exchange. Pull email + keycloak.sub out of it so
+	// Snowflake's EXTERNAL_OAUTH integration can match on email — the
+	// declarative claimsMapping in maverics.yaml populates ID tokens / userinfo
+	// but not the access-token JWT, so this is the canonical hook for putting
+	// workforce identity claims into the access token.
+	//
+	// On client_credentials grants there is no user session; sess.GetString
+	// returns an error and we leave the claims off. The downstream resource
+	// server falls back to the `sub` claim (= the OAuth client_id), which
+	// maps to the corresponding Snowflake service user.
+	if sess, err := api.Session(session.WithRequest(req)); err == nil {
+		if email, e := sess.GetString("keycloak.email"); e == nil && email != "" {
+			claims["email"] = email
+		}
+		if ksub, e := sess.GetString("keycloak.sub"); e == nil && ksub != "" {
+			claims["keycloak_sub"] = ksub
+		}
+	}
+
+	log.Info("agent-claims-se", "injected access-token claims",
 		"client_id", clientID,
 		"agent_type", claims["agent_type"],
 		"agent_provider", claims["agent_provider"],
 		"agent_instance_id", claims["agent_instance_id"],
 		"delegation_purpose", claims["delegation_purpose"],
+		"email", claims["email"],
+		"keycloak_sub", claims["keycloak_sub"],
 	)
 
 	return claims, nil

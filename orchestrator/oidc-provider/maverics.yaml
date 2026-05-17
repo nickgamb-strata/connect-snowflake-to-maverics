@@ -88,7 +88,10 @@ oidcProvider:
       privateKey: <ai_identity_gateway.oidc_signing_private_key>
 
 apps:
-  # Public client for Claude Code (and other CLI/IDE MCP clients)
+  # Public client for Claude Code, Cursor, and other CLI/IDE MCP clients.
+  # mcp-remote takes a port as its second positional arg and uses that for
+  # the local OAuth callback server, so each MCP client tool may pin a
+  # different port — they all need entries here.
   - name: mcp-client-cli
     type: oidc
     clientID: mcp-client-cli
@@ -98,6 +101,17 @@ apps:
       - http://127.0.0.1:19876/callback
       - http://localhost:3334/oauth/callback
       - http://127.0.0.1:3334/oauth/callback
+      # Cursor (mcp-remote port 3335). Same convention as mcp-client-cli-snowflake.
+      - http://localhost:3335/oauth/callback
+      - http://127.0.0.1:3335/oauth/callback
+    # Inject the user's email into the access-token JWT. claimsMapping below
+    # populates ID tokens / userinfo only; resource servers like Snowflake
+    # that match identity off access-token claims need this here. The
+    # downstream mcpBridge token exchange (ai-identity-gateway) reads this
+    # `email` out of the subject_token and forwards it on the exchanged JWT.
+    buildAccessTokenClaimsSE:
+      funcName: BuildMCPClientAccessTokenClaims
+      file: /etc/maverics/service-extensions/mcp-client-claims.go
     authentication:
       idps:
         - keycloak
@@ -154,12 +168,24 @@ apps:
       - http://127.0.0.1:19876/callback
       - http://localhost:3334/oauth/callback
       - http://127.0.0.1:3334/oauth/callback
+      # Cursor (mcp-remote port 3335). Keep the Claude/Cursor ports distinct
+      # so both can be configured at the same time without colliding.
+      - http://localhost:3335/oauth/callback
+      - http://127.0.0.1:3335/oauth/callback
     accessToken:
       type: jwt
     allowedAudiences:
-      # Snowflake account URL — set SNOWFLAKE_ACCOUNT_URL in .env and update
-      # this entry to match your account (e.g. https://abc12345.snowflakecomputing.com/).
-      - https://REPLACE_WITH_SNOWFLAKE_ACCOUNT_URL/
+      # Snowflake account URL — sourced from SNOWFLAKE_ACCOUNT_URL in .env via
+      # secrets.yaml + vault seeding (see vault/seed.sh). Keep the URL out of
+      # the committed config.
+      - <snowflake.account_url>
+      # mcp-remote sends the full managed-MCP endpoint URL as the `resource=`
+      # parameter on the token request, so we allow that exact value too.
+      - <snowflake.mcp_resource_url>
+      # The local AI Identity Gateway uses this audience when minting JWTs the
+      # gateway itself validates — enables the optional bridge-mode workaround
+      # described in optional/snowflake-bridge-workaround/.
+      - https://gateway.orchestrator.lab/
     customScopes:
       scopes:
         # Snowflake EXTERNAL_OAUTH parses the scope claim, strips the
@@ -207,9 +233,27 @@ apps:
       - urn:ietf:params:oauth:grant-type:token-exchange
     accessToken:
       type: jwt
+    # Used by the optional Snowflake mcpBridge workaround described in
+    # optional/snowflake-bridge-workaround/. The SE looks up the user's
+    # session, extracts `keycloak.email`, and injects it as the `email`
+    # claim on every JWT this client mints — including the JWTs produced
+    # via RFC 8693 delegation token exchange that the bridge sends to
+    # Snowflake's `/api/v2/statements`. Maverics' declarative `claimsMapping`
+    # populates ID tokens and userinfo by OIDC convention but does not
+    # write to the access-token JWT, so resource servers that match
+    # identity off access-token claims need the SE. Safe to leave wired
+    # even when the bridge workaround is off — the SE returns nothing on
+    # grants without a session.
+    buildAccessTokenClaimsSE:
+      funcName: BuildAIGAccessTokenClaims
+      file: /etc/maverics/service-extensions/aig-claims.go
     allowedAudiences:
       - https://employee-directory.orchestrator.lab/
       - https://enterprise-ledger.orchestrator.lab/
+      # Required for the optional Snowflake mcpBridge workaround so the
+      # AI Identity Gateway can mint Snowflake-audience JWTs via RFC 8693
+      # delegation token exchange. Pulled from SNOWFLAKE_ACCOUNT_URL in .env.
+      - <snowflake.account_url>
     customScopes:
       scopes:
         # Employee Directory scopes
@@ -227,6 +271,12 @@ apps:
         # Enterprise Ledger scopes (sensitive)
         - name: ledger:ReadPII
         - name: ledger:ReadAudit
+        # Required for the optional Snowflake mcpBridge workaround — the
+        # `session:role:` prefix is the Custom EXTERNAL_OAUTH convention
+        # for role activation; the per-tool scope flows into the JWT
+        # alongside the role binding.
+        - name: session:role:MAVERICS_DEMO_ROLE
+        - name: snowflake:sql_execution
     claimsMapping:
       email: keycloak.email
       name: keycloak.email

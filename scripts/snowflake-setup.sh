@@ -6,13 +6,19 @@
 #   SNOWFLAKE_ACCOUNT_URL   https://<account>.snowflakecomputing.com
 #   SNOWFLAKE_ADMIN_USER    Snowflake user with ACCOUNTADMIN
 #   SNOWSQL_PWD             that user's password (set by Makefile, exported here)
-#   BEDROCK_AUTH_HOSTNAME   Maverics' public Cloudflare Tunnel auth hostname
-#                           (e.g. auth.gnosisgpt.ai). Used to build the issuer
-#                           and JWKS URL that Snowflake will trust.
+#   BEDROCK_AUTH_HOSTNAME   Publicly-reachable hostname that exposes Maverics'
+#                           /oauth2/jwks endpoint (e.g. auth.example.com). The
+#                           script bakes "https://${BEDROCK_AUTH_HOSTNAME}/oauth2/jwks"
+#                           into EXTERNAL_OAUTH_JWS_KEYS_URL on the Snowflake side.
+#                           LOCAL-LAB ONLY uses a Cloudflare Tunnel for this;
+#                           production should point at a hardened public origin
+#                           (CDN, managed gateway, etc.).
 #
 # Prereqs:
 #   - snowsql installed locally (https://docs.snowflake.com/en/user-guide/snowsql)
-#   - make tunnel is up (Snowflake fetches the JWKS over the public hostname)
+#   - The host at $BEDROCK_AUTH_HOSTNAME is reachable from Snowflake's network
+#     and serves Maverics' JWKS at /oauth2/jwks (verify with `curl` from any
+#     box outside your LAN).
 set -euo pipefail
 
 : "${SNOWFLAKE_ACCOUNT_URL:?SNOWFLAKE_ACCOUNT_URL must be set in .env}"

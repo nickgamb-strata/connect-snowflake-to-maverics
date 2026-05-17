@@ -1,0 +1,127 @@
+openapi: 3.0.0
+info:
+  title: Snowflake SQL Shim
+  description: |
+    Local-only proxy that fronts Snowflake's /api/v2/statements REST API
+    so Maverics' mcpBridge can expose it as an MCP tool. Exists only to
+    work around a Snowflake managed-MCP bug where SYSTEM_EXECUTE_SQL
+    tools/call fails with "Error parsing response" under EXTERNAL_OAUTH.
+    The same JWT runs SQL fine against /api/v2/statements.
+  version: 1.0.0
+
+servers:
+  - url: /
+    description: Local
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT minted by Maverics' OIDC Provider via RFC 8693 delegation
+        token exchange. Audience = Snowflake account URL, scope includes
+        `session:role:MAVERICS_DEMO_ROLE`.
+
+  schemas:
+    QueryRequest:
+      type: object
+      properties:
+        sql:
+          type: string
+          description: Read-only SQL statement (SELECT / SHOW / DESCRIBE).
+          example: "SELECT C_NAME, C_NATIONKEY, C_ACCTBAL FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER ORDER BY C_ACCTBAL DESC LIMIT 5"
+        warehouse:
+          type: string
+          example: MAVERICS_WH
+          description: Snowflake warehouse to execute against. Defaults to MAVERICS_WH.
+        role:
+          type: string
+          example: MAVERICS_DEMO_ROLE
+          description: Snowflake role to activate. Defaults to MAVERICS_DEMO_ROLE.
+      required:
+        - sql
+
+    QueryResult:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: Column names in the result set.
+        row_count:
+          type: integer
+        rows:
+          type: array
+          description: Rows as column-keyed objects.
+          items:
+            type: object
+            additionalProperties: true
+        statement_handle:
+          type: string
+        warehouse:
+          type: string
+        role:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+
+paths:
+  /sql:
+    post:
+      operationId: runQuery
+      summary: Run a SQL query against the Snowflake data warehouse.
+      description: |
+        Execute a SQL statement on the Snowflake data warehouse and return the
+        result rows. Use this tool whenever the user asks about data that lives
+        in Snowflake — analytics queries, TPC-H sample data, customer or order
+        records, account balances, or any question requiring SQL against a
+        data warehouse. Provide a complete SELECT (or SHOW / DESCRIBE)
+        statement in the `sql` parameter.
+
+        Available sample data:
+          - SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.CUSTOMER  (C_NAME, C_NATIONKEY, C_ACCTBAL, C_PHONE, C_MKTSEGMENT, C_COMMENT, ...)
+          - SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS    (O_ORDERKEY, O_CUSTKEY, O_TOTALPRICE, O_ORDERDATE, ...)
+          - SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.LINEITEM, .NATION, .REGION, .PART, .SUPPLIER, .PARTSUPP
+
+        This tool calls Snowflake under the caller's federated identity — the
+        user's Keycloak `sub` and `email` ride through on the exchanged JWT,
+        so Snowflake RBAC, row-access policies, and masking policies all see
+        the human. Do NOT use the enterprise-ledger or employee-directory
+        tools for warehouse analytics — those are unrelated REST backends.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResult'
+        '401':
+          description: Missing or invalid Authorization header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Snowflake returned an error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

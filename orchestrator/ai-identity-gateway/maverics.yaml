@@ -126,6 +126,44 @@ apps:
               scopes:
                 - name: ledger:ReadAudit
 
+  # ─────────────────────────────────────────────────────────────────────────
+  # Optional workaround for the Snowflake managed-MCP `tools/call` bug
+  # described in optional/snowflake-bridge-workaround/README.md. When that
+  # bug is fixed on Snowflake's side, this stanza, the snowflake-shim
+  # service in docker-compose.yml, the OPA policy at
+  # /etc/maverics/policies/snowflake-bridge-inbound-authz.rego, and the
+  # buildAccessTokenClaimsSE wiring on the `ai-identity-gateway` and
+  # `mcp-client-cli` clients in orchestrator/oidc-provider/maverics.yaml
+  # can all be removed.
+  # ─────────────────────────────────────────────────────────────────────────
+  - name: snowflake-bridge
+    type: mcpBridge
+    mode: openapi
+    toolNamespace:
+      disabled: false
+      name: snowflake_
+    openapi:
+      spec:
+        uri: file:///etc/maverics/optional/snowflake-shim/openapi.yaml
+      baseURL: http://snowflake-shim:5000
+    authorization:
+      inbound:
+        opa:
+          name: snowflake-bridge-inbound-authz
+          file: /etc/maverics/optional/policies/snowflake-bridge-inbound-authz.rego
+      outbound:
+        type: tokenExchange
+        tokenExchange:
+          type: delegation
+          idp: oidc-provider
+          audience: <snowflake.account_url>
+          tools:
+            - name: runQuery
+              ttl: 60s
+              scopes:
+                - name: session:role:MAVERICS_DEMO_ROLE
+                - name: snowflake:sql_execution
+
   # MCP Bridge — auto-generates MCP tools from Employee Directory OpenAPI spec
   - name: employee-directory-bridge
     type: mcpBridge

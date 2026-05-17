@@ -55,19 +55,15 @@ for k in ['iss','sub','aud','scope','exp','iat','agent_type','agent_provider','a
 echo ""
 echo "==> 3. Snowflake SQL API call with the Maverics JWT"
 echo "    sql: ${DEMO_SQL}"
+REQ_BODY=$(DEMO_SQL="${DEMO_SQL}" \
+  SNOWFLAKE_WAREHOUSE="${SNOWFLAKE_WAREHOUSE}" \
+  SNOWFLAKE_ROLE="${SNOWFLAKE_ROLE}" \
+  python3 -c 'import json, os; print(json.dumps({"statement": os.environ["DEMO_SQL"], "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"], "role": os.environ["SNOWFLAKE_ROLE"], "timeout": 30}))')
 curl -sS -X POST "${ACCOUNT_URL}/api/v2/statements" \
   -H "Authorization: Bearer ${JWT}" \
   -H "X-Snowflake-Authorization-Token-Type: OAUTH" \
   -H "Content-Type: application/json" \
-  -d "$(python3 -c "
-import json, os
-print(json.dumps({
-  'statement': os.environ['DEMO_SQL'],
-  'warehouse': os.environ['SNOWFLAKE_WAREHOUSE'],
-  'role':      os.environ['SNOWFLAKE_ROLE'],
-  'timeout':   30,
-}))
-")" \
+  -d "${REQ_BODY}" \
   --max-time 30 \
   | python3 -c "
 import json, sys
@@ -83,6 +79,14 @@ else:
 "
 
 # ── 4. Snowflake managed MCP tools/list (optional) ──────────────────────
+#
+# Note: at the time of writing, Snowflake's managed MCP returns "Error
+# parsing response" on every tools/call against SYSTEM_EXECUTE_SQL under
+# EXTERNAL_OAUTH, while tools/list works fine through the same JWT. We
+# probe tools/list here as part of the demo for that reason — it proves
+# the federation reaches the MCP endpoint. If you need tools/call to
+# work today, see the "If tools/call fails" section in the README for
+# the mcpBridge-based workaround.
 if [ -n "${SNOWFLAKE_MCP_PATH:-}" ]; then
   echo ""
   echo "==> 4. Snowflake managed MCP tools/list"

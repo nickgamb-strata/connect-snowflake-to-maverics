@@ -44,6 +44,17 @@ if [ -z "$SECRET_KEYS" ]; then
     exit 0
 fi
 
+# expand_env replaces a fixed allowlist of `${ENV_VAR}` references in a
+# secret value with the corresponding environment variable at the time
+# seed.sh runs. Lets secrets.yaml ship with placeholders and the running
+# Orchestrator pull the real value out of the user's .env without storing
+# personal details (Snowflake account URL, public JWKS host, …) in git.
+expand_env() {
+    printf '%s' "$1" | sed \
+        -e "s|\${SNOWFLAKE_ACCOUNT_URL}|${SNOWFLAKE_ACCOUNT_URL:-}|g" \
+        -e "s|\${BEDROCK_AUTH_HOSTNAME}|${BEDROCK_AUTH_HOSTNAME:-}|g"
+}
+
 # Build JSON payload by processing each secret
 PAYLOAD='{'
 FIRST=true
@@ -51,6 +62,7 @@ FIRST=true
 for KEY in $SECRET_KEYS; do
     # Check for value or file
     VALUE=$(yq ".secrets[\"$KEY\"].value // \"\"" "$SECRETS_FILE")
+    VALUE=$(expand_env "$VALUE")
     FILE=$(yq ".secrets[\"$KEY\"].file // \"\"" "$SECRETS_FILE")
 
     if [ -n "$VALUE" ] && [ "$VALUE" != "null" ]; then

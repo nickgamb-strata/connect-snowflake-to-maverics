@@ -12,9 +12,9 @@
 --
 -- Environment substitutions performed by scripts/snowflake-setup.sh before
 -- snowsql executes this file:
---   __SNOWFLAKE_ACCOUNT_URL__   e.g. https://abc12345.snowflakecomputing.com
---   __MAVERICS_ISSUER__         e.g. https://auth.gnosisgpt.ai
---   __MAVERICS_JWKS_URL__       e.g. https://auth.gnosisgpt.ai/oauth2/jwks
+--   __SNOWFLAKE_ACCOUNT_URL__     e.g. https://abc12345.snowflakecomputing.com
+--   __MAVERICS_INTERNAL_ISSUER__  the issuer URL Maverics signs JWTs with (internal lab hostname)
+--   __MAVERICS_JWKS_URL__         publicly-reachable JWKS endpoint Snowflake fetches keys from
 --
 -- Re-runnable: every CREATE uses IF NOT EXISTS or CREATE OR REPLACE so this
 -- file can be applied repeatedly without errors.
@@ -38,22 +38,49 @@ GRANT USAGE ON DATABASE MAVERICS_DEMO TO ROLE MAVERICS_DEMO_ROLE;
 -- TPC-H sample data is what the demo queries via Cortex Analyst.
 GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE_SAMPLE_DATA TO ROLE MAVERICS_DEMO_ROLE;
 
--- ── Service user mapped to Maverics' `sub` claim ─────────────────────────
--- LOGIN_NAME must match the value in the JWT's `sub` claim. Maverics' OIDC
--- Provider sets `sub` to the OAuth client_id when issuing client_credentials
--- tokens. For the mcp-client-cli-snowflake client used in this tutorial,
--- `sub` resolves to "mcp-client-cli-snowflake" on client_credentials grants.
--- On authorization_code grants (Claude Desktop driving the flow), `sub`
--- resolves to the Keycloak user — to support that path, create a second
--- Snowflake user with LOGIN_NAME matching the human's Keycloak `sub`.
+-- ── Federated users — service + workforce ────────────────────────────────
+-- Snowflake looks up a Snowflake user from one of the JWT's identity claims
+-- (configured below as ('email','sub') — Snowflake tries email first, falls
+-- back to sub if no match). The two flows in this tutorial issue different
+-- claims:
+--
+--   1. client_credentials grants (scripts/snowflake-demo.sh) — `sub` is the
+--      OAuth client_id, "mcp-client-cli-snowflake". No `email` claim.
+--      Maps to MAVERICS_AGENT below.
+--
+--   2. authorization_code grants (Claude Desktop / Cursor via Keycloak) —
+--      `email` is the user's Keycloak email; `sub` is their Keycloak UUID.
+--      Maps to JOHN_MCCLANE / SARAH_CONNOR below by email.
+--
+-- For your own workforce, replace the two test users with `CREATE USER`
+-- statements whose LOGIN_NAME matches each human's IdP email — or whatever
+-- claim your IdP guarantees stable per user. TYPE = SERVICE keeps the demo
+-- off Snowflake's seat count; for production workforce identities use
+-- TYPE = PERSON so MFA/SCIM/lifecycle policies apply.
+
 CREATE USER IF NOT EXISTS MAVERICS_AGENT
   TYPE = SERVICE
   LOGIN_NAME = 'mcp-client-cli-snowflake'
   DEFAULT_ROLE = MAVERICS_DEMO_ROLE
   DEFAULT_WAREHOUSE = MAVERICS_WH
-  COMMENT = 'Federated identity from Maverics — receives JWTs validated by MAVERICS_EXTERNAL_OAUTH.';
-
+  COMMENT = 'Service identity for client_credentials demo flow. JWT sub maps here.';
 GRANT ROLE MAVERICS_DEMO_ROLE TO USER MAVERICS_AGENT;
+
+CREATE USER IF NOT EXISTS JOHN_MCCLANE
+  TYPE = SERVICE
+  LOGIN_NAME = 'john.mcclane@orchestrator.lab'
+  DEFAULT_ROLE = MAVERICS_DEMO_ROLE
+  DEFAULT_WAREHOUSE = MAVERICS_WH
+  COMMENT = 'Test workforce user (matches Keycloak email).';
+GRANT ROLE MAVERICS_DEMO_ROLE TO USER JOHN_MCCLANE;
+
+CREATE USER IF NOT EXISTS SARAH_CONNOR
+  TYPE = SERVICE
+  LOGIN_NAME = 'sarah.connor@orchestrator.lab'
+  DEFAULT_ROLE = MAVERICS_DEMO_ROLE
+  DEFAULT_WAREHOUSE = MAVERICS_WH
+  COMMENT = 'Test workforce user (matches Keycloak email).';
+GRANT ROLE MAVERICS_DEMO_ROLE TO USER SARAH_CONNOR;
 
 -- ── EXTERNAL_OAUTH integration trusting Maverics ────────────────────────
 -- Snowflake validates incoming JWTs against the JWS keys at
@@ -82,7 +109,11 @@ CREATE OR REPLACE SECURITY INTEGRATION MAVERICS_EXTERNAL_OAUTH
   EXTERNAL_OAUTH_ISSUER = '__MAVERICS_INTERNAL_ISSUER__'
   EXTERNAL_OAUTH_JWS_KEYS_URL = '__MAVERICS_JWKS_URL__'
   EXTERNAL_OAUTH_AUDIENCE_LIST = ('__MAVERICS_INTERNAL_ISSUER__', '__SNOWFLAKE_ACCOUNT_URL__/')
-  EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = 'sub'
+  -- Map JWTs by `email` first (matches the workforce users above), fall back
+  -- to `sub` (which on client_credentials grants is the OAuth client_id, e.g.
+  -- "mcp-client-cli-snowflake" → MAVERICS_AGENT). Listing both lets the same
+  -- integration serve service-account and human-workforce flows.
+  EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM = ('email', 'sub')
   EXTERNAL_OAUTH_SNOWFLAKE_USER_MAPPING_ATTRIBUTE = 'LOGIN_NAME'
   EXTERNAL_OAUTH_ANY_ROLE_MODE = 'DISABLE'
   EXTERNAL_OAUTH_ALLOWED_ROLES_LIST = ('MAVERICS_DEMO_ROLE')
@@ -118,4 +149,6 @@ GRANT USAGE ON MCP SERVER MAVERICS_DEMO.MCP.MAVERICS_AGENT_MCP TO ROLE MAVERICS_
 -- ── Sanity probes (informational, safe to skip) ──────────────────────────
 SHOW SECURITY INTEGRATIONS LIKE 'MAVERICS_EXTERNAL_OAUTH';
 SHOW USERS LIKE 'MAVERICS_AGENT';
+SHOW USERS LIKE 'JOHN_MCCLANE';
+SHOW USERS LIKE 'SARAH_CONNOR';
 SHOW MCP SERVERS LIKE 'MAVERICS_AGENT_MCP' IN SCHEMA MAVERICS_DEMO.MCP;
