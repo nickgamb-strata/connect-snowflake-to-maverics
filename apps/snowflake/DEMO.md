@@ -153,7 +153,7 @@ Open `apps/snowflake/GAPS.md` on screen and walk through it column by
 column. The headline items:
 
 - **Maverics gaps**: declarative custom claims (vs. the Go SE), per-app default audience override, `tokenBrokering` graduation from experimental, per-mapping JWT TTL, inbound-to-brokered agent-identity propagation.
-- **Snowflake gaps**: native Stage-4 compounded-JWT mint, Tier-1 partner trust UX (vs. raw `CREATE SECURITY INTEGRATION` SQL), RFC 9728 Protected Resource Metadata on managed MCP, per-tool scope vocabulary, custom-claim availability to row-access / masking policies, the `SYSTEM_EXECUTE_SQL` `tools/call` parsing bug.
+- **Snowflake gaps**: native Stage-4 compounded-JWT mint, Tier-1 partner trust UX (vs. raw `CREATE SECURITY INTEGRATION` SQL), RFC 9728 Protected Resource Metadata on managed MCP, per-tool scope vocabulary, custom-claim availability to row-access / masking policies, the `SYSTEM_EXECUTE_SQL` `tools/call` parsing bug (workaround documented in the [tutorial README](../../README.md#if-toolscall-fails--front-snowflakes-rest-api-with-mcpbridge-optional) — front Snowflake's REST API with Maverics `mcpBridge`).
 
 ### Closing line
 
