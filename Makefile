@@ -1,6 +1,6 @@
 SHELL=/bin/bash -o pipefail
 
-.PHONY: init up down logs smoke-test
+.PHONY: init up down logs smoke-test snowflake-setup snowflake-demo
 
 init:
 	mkdir -p ./certs
@@ -86,3 +86,12 @@ smoke-test:
 		[ "$$STATUS" = "401" ] && echo "  Gateway auth: OK (401)" || echo "  Gateway auth: UNEXPECTED ($$STATUS)"
 	@echo "==> Checking Protected Resource Metadata..."
 	@curl -sk https://gateway.orchestrator.lab/.well-known/oauth-protected-resource | grep -q authorization_servers && echo "  Protected Resource Metadata: OK" || echo "  Protected Resource Metadata: FAIL"
+
+# Snowflake federated-trust demo. Sequence after `make up`:
+#   snowflake-setup — applies apps/snowflake/setup.sql against your account
+#   snowflake-demo  — mints a JWT, decodes it, runs a TPC-H query via SQL API
+snowflake-setup:
+	@set -a && . ./.env && set +a && bash scripts/snowflake-setup.sh
+
+snowflake-demo:
+	@set -a && . ./.env && set +a && bash scripts/snowflake-demo.sh

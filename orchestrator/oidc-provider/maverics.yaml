@@ -115,6 +115,83 @@ apps:
       family_name: keycloak.family_name
       given_name: keycloak.given_name
 
+  # MCP client variant bound to Snowflake's managed MCP audience.
+  #
+  # Mint flow: the MCP client (Claude Desktop, Claude Code, Cursor, …)
+  # authenticates as mcp-client-cli-snowflake against the OIDC Provider;
+  # tokens issued here carry `aud` resolvable to the Snowflake account URL.
+  # Snowflake's EXTERNAL_OAUTH_INTEGRATION validates the JWT against this
+  # OIDC Provider's JWKS and uses the `sub` claim to map to a Snowflake user.
+  #
+  # Two pieces are wired on this app that the existing mcp-client-cli does
+  # not use:
+  #   1. buildAccessTokenClaimsSE — Go Service Extension that injects
+  #      agent_type, agent_provider, agent_instance_id, delegation_purpose
+  #      into the JWT.
+  #   2. tokenMinting OPA policy — gates the mint on the requested scope
+  #      including a session:role:* binding so only Snowflake-bound tokens
+  #      issue through this client.
+  #
+  # Confidential client (has a secret) so the demo script can drive the
+  # client_credentials grant non-interactively. The authorization_code +
+  # PKCE grant is also enabled for Claude Desktop / interactive MCP clients
+  # — see `apps/snowflake/README.md`.
+  - name: mcp-client-cli-snowflake
+    type: oidc
+    clientID: mcp-client-cli-snowflake
+    credentials:
+      secrets:
+        - <mcp_client_cli_snowflake.client_secret>
+    authentication:
+      idps:
+        - keycloak
+    grantTypes:
+      - authorization_code
+      - refresh_token
+      - client_credentials
+    redirectURLs:
+      - http://localhost:19876/callback
+      - http://127.0.0.1:19876/callback
+      - http://localhost:3334/oauth/callback
+      - http://127.0.0.1:3334/oauth/callback
+    accessToken:
+      type: jwt
+    allowedAudiences:
+      # Snowflake account URL — set SNOWFLAKE_ACCOUNT_URL in .env and update
+      # this entry to match your account (e.g. https://abc12345.snowflakecomputing.com/).
+      - https://REPLACE_WITH_SNOWFLAKE_ACCOUNT_URL/
+    customScopes:
+      scopes:
+        # Snowflake EXTERNAL_OAUTH parses the scope claim, strips the
+        # `session:role:` prefix, and looks up the resulting role name in
+        # EXTERNAL_OAUTH_ALLOWED_ROLES_LIST. The colon-colon form is what
+        # Custom External OAuth expects.
+        - name: session:role:MAVERICS_DEMO_ROLE
+        # Logical per-tool scopes carried alongside the role binding so
+        # downstream policies (masking, row-access) can read agent intent
+        # directly from the JWT.
+        - name: snowflake:cortex_analyst
+        - name: snowflake:cortex_search
+        - name: snowflake:sql_execution
+    claimsMapping:
+      email: keycloak.email
+      name: keycloak.email
+      family_name: keycloak.family_name
+      given_name: keycloak.given_name
+      sub: keycloak.sub
+    authorization:
+      # Request-level authorization (allow any authenticated caller to ask
+      # for a token; the OPA policy below gates whether the mint succeeds).
+      allowAll: true
+      tokenMinting:
+        accessToken:
+          policies:
+            - name: snowflake-token-minting
+              file: /etc/maverics/policies/snowflake-token-minting.rego
+    buildAccessTokenClaimsSE:
+      funcName: BuildAccessTokenClaims
+      file: /etc/maverics/service-extensions/agent-claims.go
+
   # AI Identity Gateway client for RFC 8693 token exchange
   - name: ai-identity-gateway
     type: oidc

@@ -149,6 +149,8 @@ services:
         condition: service_completed_successfully
     volumes:
       - oidc-provider-config:/etc/maverics/config:ro
+      - ./orchestrator/oidc-provider/service-extensions:/etc/maverics/service-extensions:ro
+      - ./orchestrator/oidc-provider/policies:/etc/maverics/policies:ro
       - ./certs/internal-server.pem:/etc/maverics/certs/internal-server.pem
       - ./certs/internal-server-key.pem:/etc/maverics/certs/internal-server-key.pem
       - ./certs/internal-client.pem:/etc/maverics/certs/internal-client.pem
