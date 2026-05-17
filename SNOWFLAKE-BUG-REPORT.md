@@ -171,5 +171,4 @@ Until this is fixed, the supporting repo ships an opt-in workaround at
 
 ## Contact
 
-Nick Gamble, Strata Identity — `nick.gamble@strata.io` / Slack `@nickgamble`
-Tagging Kelvin Chen as Snowflake-side counterpart on this thread.
+Nick Gamb, Strata Identity — `nick.gamb@strata.io` / Slack `@nickgamb-strata`
