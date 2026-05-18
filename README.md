@@ -233,9 +233,7 @@ When Snowflake's `tools/call` lands a fix, delete the shim service, delete the `
 | `apps/snowflake/setup.sql` | Snowflake-side DDL: warehouse, role, service + workforce users, `EXTERNAL_OAUTH_INTEGRATION` (maps `('email','sub')` → `LOGIN_NAME`), managed MCP server. |
 | `apps/snowflake/architecture.svg` | High-level customer-facing diagram. |
 | `apps/snowflake/DEMO.md` | Presenter-facing live demo script. |
-| `apps/snowflake/GAPS.md` | What's not yet shipping on either side — roadmap items for both Maverics and Snowflake. |
 | `optional/snowflake-bridge-workaround/` | Workaround for the Snowflake managed-MCP `tools/call` bug — shim source, OpenAPI spec, OPA policy, and full README. Wired into the default `docker-compose.yml`; remove cleanly when Snowflake ships a fix. |
-| `SNOWFLAKE-BUG-REPORT.md` | JIRA-ready reproduction + diagnostic writeup for the `tools/call` bug that motivates `optional/snowflake-bridge-workaround/`. |
 | `scripts/snowflake-setup.sh` | Renders `setup.sql` with env-driven values and applies it via `snowsql`. |
 | `scripts/snowflake-demo.sh` | One-command end-to-end demo: mint JWT, decode, query, optional MCP probe. |
 | `secrets.yaml` + `vault/seed.sh` | Vault seeding — `seed.sh` expands `${SNOWFLAKE_ACCOUNT_URL}` placeholders in `secrets.yaml` from the `.env` file so the committed YAML stays free of personal details. |
@@ -274,4 +272,4 @@ When Snowflake's `tools/call` lands a fix, delete the shim service, delete the `
 | `KeyError: 'access_token'` in `snowflake-demo` | Env not loaded: run `set -a && . ./.env && set +a` first, then re-run |
 | Snowflake says "Invalid OAuth access token" | The `iss` claim on the JWT must match `EXTERNAL_OAUTH_ISSUER` exactly. Maverics signs with `https://auth.orchestrator.lab` — make sure that's what the integration trusts |
 | Snowflake says "role not listed in the Access Token" | The `scope` claim must include `session:role:<role>`. Snowflake parses that and looks up the role name in `EXTERNAL_OAUTH_ALLOWED_ROLES_LIST` |
-| Snowflake managed MCP `tools/call` returns "Error parsing response" | Tracked Snowflake-side bug — `tools/list` works, and the same JWT runs SQL fine against `/api/v2/statements` (which is why `make snowflake-demo` keeps working). See the [`mcpBridge` workaround](#if-toolscall-fails--front-snowflakes-rest-api-with-mcpbridge-optional) above and `apps/snowflake/GAPS.md` item #11 |
+| Snowflake managed MCP `tools/call` returns "Error parsing response" | Tracked Snowflake-side bug — `tools/list` works, and the same JWT runs SQL fine against `/api/v2/statements` (which is why `make snowflake-demo` keeps working). See the 
