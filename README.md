@@ -2,8 +2,6 @@
 
 A self-contained example connecting Claude Desktop (and other MCP clients) to **Snowflake's managed MCP server** through Maverics-issued JWTs — federated trust without a service account. Snowflake validates the JWT against Maverics' JWKS via `EXTERNAL_OAUTH_INTEGRATION`. Maverics is **not** in the data path on the actual query.
 
-This tutorial is the technical companion to [**"Databricks and Snowflake MCP servers your security team will actually approve"**](https://www.strata.io/blog/databricks-and-snowflake-mcp-servers-your-security-team-will-actually-approve/) — that post frames *why* shared service accounts are an audit dead-end and lays out the Federated Exchange pattern; this repo is the working *how* against Snowflake's managed MCP. The companion dev post — *Connect Snowflake to Maverics: Federated Identity for Workforce AI Clients* — is on [maverics.ai/blog](https://www.maverics.ai/blog).
-
 This tutorial starts from the same lab baseline as [connect-claude-to-maverics](https://github.com/nickgamb-strata/connect-claude-to-maverics) and layers the Snowflake federation on top. The parallel [connect-aws-bedrock-to-maverics](https://github.com/nickgamb-strata/connect-aws-bedrock-to-maverics) tutorial does the same with AWS Bedrock AgentCore. You can follow either, or both — they don't depend on each other.
 
 ## What you get
@@ -252,7 +250,6 @@ When Snowflake's `tools/call` lands a fix, delete the shim service, delete the `
 
 ## Reference docs
 
-- ["Databricks and Snowflake MCP servers your security team will actually approve"](https://www.strata.io/blog/databricks-and-snowflake-mcp-servers-your-security-team-will-actually-approve/) — the strategy-side companion piece. This tutorial is its technical implementation.
 - [Strata: AI Identity Gateway overview](https://docs.strata.io/guides/ai-identity/)
 - [Strata: Service Extensions — OIDC hooks](https://docs.strata.io/reference/orchestrator/service-extensions/oidc) — including `buildAccessTokenClaimsSE`
 - [Strata: MCP Bridge App](https://docs.strata.io/reference/orchestrator/applications/mcp-bridge) — REST→MCP tool generation (the pattern under `optional/snowflake-bridge-workaround/`)
